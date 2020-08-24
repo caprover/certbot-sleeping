@@ -10,8 +10,8 @@ rm -f DockerfileProcessed.*
 echo "Cleaning up..."
 sleep 1s
 
-CERTBOT_IMAGE_NAME="caprover/certbot-sleeping"
-CERTBOT_VERSION="v1.6.0"
+export CERTBOT_IMAGE_NAME="caprover/certbot-sleeping"
+export CERTBOT_VERSION="v1.6.0"
 
 
 
@@ -27,10 +27,10 @@ echo ""
 echo "Building..."
 for i in {0..2}
 do
-    ORIGINAL_TAG="${ARCH_CERTBOT_TAGS[$i]}"
-    CERTBOT_ARCH="${CERTBOT_ARCHS[$i]}"
+    export ORIGINAL_TAG="${ARCH_CERTBOT_TAGS[$i]}"
+    export CERTBOT_ARCH="${CERTBOT_ARCHS[$i]}"
     echo "$CERTBOT_ARCH maps to cerbot:$ORIGINAL_TAG"
-    eval "echo \"$(cat Dockerfile)\"" > DockerfileProcessed.$CERTBOT_ARCH
+    envsubst < Dockerfile > DockerfileProcessed.$CERTBOT_ARCH
     docker buildx build --platform linux/$CERTBOT_ARCH -t $CERTBOT_IMAGE_NAME:$CERTBOT_ARCH-$CERTBOT_VERSION --push -f DockerfileProcessed.$CERTBOT_ARCH .
 done
 
