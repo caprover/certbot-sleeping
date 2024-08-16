@@ -4,46 +4,38 @@
 set -e
 
 # Print all commands
-# set -x 
+set -x
 
-rm -f DockerfileProcessed.*
-echo "Cleaning up..."
-sleep 1s
+pwd
 
 export CERTBOT_IMAGE_NAME="caprover/certbot-sleeping"
-export CERTBOT_VERSION="v1.14.0"
+export CERTBOT_VERSION="v2.11.0"
+PROCESSED_DOCKERFILE="DockerfileProcessed.release"
+envsubst <Dockerfile >$PROCESSED_DOCKERFILE
 
+# ensure you're not running it on local machine
+if [ -z "$CI" ] || [ -z "$GITHUB_REF" ]; then
+    echo "Running on a local machine! Exiting!"
+    exit 127
+else
+    echo "Running on CI"
+fi
 
+# BRANCH=$(git rev-parse --abbrev-ref HEAD)
+# On Github the line above does not work, instead:
+BRANCH=${GITHUB_REF##*/}
+echo "on branch $BRANCH"
+if [[ "$BRANCH" != "master" ]]; then
+    echo 'Not on master branch! Aborting script!'
+    exit 1
+fi
 
+exit 1
+
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 export DOCKER_CLI_EXPERIMENTAL=enabled
 docker buildx ls
-docker buildx create --name mybuilder || echo "Already created!"
+docker buildx create --name mybuilder
 docker buildx use mybuilder
 
-declare -a ARCH_CERTBOT_TAGS=("amd64" "arm64v8" "arm32v6")
-declare -a CERTBOT_ARCHS=("amd64" "arm64" "arm")
-
-echo ""
-echo "Building..."
-for i in {0..2}
-do
-    export ORIGINAL_TAG="${ARCH_CERTBOT_TAGS[$i]}"
-    export CERTBOT_ARCH="${CERTBOT_ARCHS[$i]}"
-    echo "$CERTBOT_ARCH maps to cerbot:$ORIGINAL_TAG"
-    envsubst < Dockerfile > DockerfileProcessed.$CERTBOT_ARCH
-    docker buildx build --platform linux/$CERTBOT_ARCH -t $CERTBOT_IMAGE_NAME:$CERTBOT_ARCH-$CERTBOT_VERSION --push -f DockerfileProcessed.$CERTBOT_ARCH .
-done
-
-docker manifest create $CERTBOT_IMAGE_NAME:$CERTBOT_VERSION \
-                       $CERTBOT_IMAGE_NAME:amd64-$CERTBOT_VERSION \
-                       $CERTBOT_IMAGE_NAME:arm64-$CERTBOT_VERSION \
-                       $CERTBOT_IMAGE_NAME:arm-$CERTBOT_VERSION
-
-docker manifest create $CERTBOT_IMAGE_NAME:latest \
-                       $CERTBOT_IMAGE_NAME:amd64-$CERTBOT_VERSION \
-                       $CERTBOT_IMAGE_NAME:arm64-$CERTBOT_VERSION \
-                       $CERTBOT_IMAGE_NAME:arm-$CERTBOT_VERSION
-
-
-docker manifest push $CERTBOT_IMAGE_NAME:$CERTBOT_VERSION
-docker manifest push $CERTBOT_IMAGE_NAME:latest
+docker buildx build --platform linux/amd64,linux/arm64,linux/arm -t $CERTBOT_IMAGE_NAME:$CERTBOT_VERSION -t $CERTBOT_IMAGE_NAME:latest -f $PROCESSED_DOCKERFILE --push .
