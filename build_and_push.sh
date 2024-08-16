@@ -30,8 +30,6 @@ if [[ "$BRANCH" != "master" ]]; then
     exit 1
 fi
 
-exit 1
-
 docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 export DOCKER_CLI_EXPERIMENTAL=enabled
 docker buildx ls
